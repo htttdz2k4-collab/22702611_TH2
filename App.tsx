@@ -5,10 +5,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NavigationContainer } from '@react-navigation/native';
 import { RootNavigator } from './src/navigation/RootNavigator';
 
+import { STALE_TIME_MS } from './src/constants/student';
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 2,
+      staleTime: STALE_TIME_MS,
+      retry: 1,
       refetchOnWindowFocus: false,
     },
   },
