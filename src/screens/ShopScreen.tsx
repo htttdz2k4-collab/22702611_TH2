@@ -52,7 +52,7 @@ export const ShopScreen = () => {
       ReactNativeHapticFeedback.trigger(
         VARIANT.hapticOnAdd === 'impact' ? 'impactMedium' : 'selection',
       );
-    } catch (e) {
+    } catch {
       // Ignored for emulator fallback
     }
 

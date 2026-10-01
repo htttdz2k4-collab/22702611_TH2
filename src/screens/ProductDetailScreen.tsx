@@ -46,7 +46,7 @@ export const ProductDetailScreen = () => {
       ReactNativeHapticFeedback.trigger(
         VARIANT.hapticOnAdd === 'impact' ? 'impactMedium' : 'selection',
       );
-    } catch (e) {
+    } catch {
       // Fallback
     }
 
@@ -96,7 +96,7 @@ export const ProductDetailScreen = () => {
         <Text style={styles.headerTitle} numberOfLines={1}>
           Chi tiết món
         </Text>
-        <View style={{ width: 60 }} />
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -203,6 +203,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: COLORS.text,
+  },
+  headerSpacer: {
+    width: 60,
   },
   scrollContent: {
     padding: 16,

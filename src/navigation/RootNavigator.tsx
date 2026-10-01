@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { Text, StyleSheet } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuthStore } from '../store/authStore';
@@ -15,6 +15,10 @@ import { COLORS } from '../constants/theme';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
+const renderShopIcon = () => <Text style={styles.tabIcon}>🛍️</Text>;
+const renderCartIcon = () => <Text style={styles.tabIcon}>🛒</Text>;
+const renderProfileIcon = () => <Text style={styles.tabIcon}>👤</Text>;
+
 const MainTabs = () => {
   const totalItems = useCartStore((state) => state.getTotalItems());
 
@@ -25,7 +29,7 @@ const MainTabs = () => {
       component={ShopScreen}
       options={{
         title: 'Cửa hàng',
-        tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🛍️</Text>,
+        tabBarIcon: renderShopIcon,
       }}
     />
   );
@@ -38,7 +42,7 @@ const MainTabs = () => {
       options={{
         title: 'Giỏ hàng',
         tabBarBadge: totalItems > 0 ? totalItems : undefined,
-        tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🛒</Text>,
+        tabBarIcon: renderCartIcon,
       }}
     />
   );
@@ -50,7 +54,7 @@ const MainTabs = () => {
       component={ProfileScreen}
       options={{
         title: 'Cá nhân',
-        tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>👤</Text>,
+        tabBarIcon: renderProfileIcon,
       }}
     />
   );
@@ -66,17 +70,8 @@ const MainTabs = () => {
         headerShown: false,
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.textLight,
-        tabBarStyle: {
-          backgroundColor: COLORS.surface,
-          borderTopColor: COLORS.border,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 6,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-        },
+        tabBarStyle: styles.tabBar,
+        tabBarLabelStyle: styles.tabBarLabel,
       }}
     >
       {tabsInOrder}
@@ -106,5 +101,22 @@ export const RootNavigator = () => {
     </Stack.Navigator>
   );
 };
+
+const styles = StyleSheet.create({
+  tabIcon: {
+    fontSize: 20,
+  },
+  tabBar: {
+    backgroundColor: COLORS.surface,
+    borderTopColor: COLORS.border,
+    height: 60,
+    paddingBottom: 8,
+    paddingTop: 6,
+  },
+  tabBarLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+});
 
 export default RootNavigator;

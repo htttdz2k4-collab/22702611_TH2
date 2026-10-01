@@ -29,5 +29,5 @@ export function examStamp(): string {
     for (let i = 0; i < raw.length; i++) {
         h = Math.imul(h, 33) ^ raw.charCodeAt(i);
     }
-    return String(Math.abs(h) % 1000000).padStart(6, '0');
+    return `#${String(Math.abs(h) % 1000000).padStart(6, '0')}`;
 }

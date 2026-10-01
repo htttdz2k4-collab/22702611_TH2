@@ -42,7 +42,7 @@ function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lo
 
 export const ProfileScreen = () => {
   const logout = useAuthStore((state) => state.logout);
-  const { distanceKm, shippingFee, shippingFormula, setShippingInfo } = useCartStore();
+  const { distanceKm, shippingFee, setShippingInfo } = useCartStore();
 
   const [locating, setLocating] = useState(false);
   const [currentCoords, setCurrentCoords] = useState<{ lat: number; lng: number } | null>(null);
