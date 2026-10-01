@@ -14,16 +14,32 @@ import { useQuery } from '@tanstack/react-query';
 import { axiosClient } from '../api/axiosClient';
 import { ProductCard } from '../components/ProductCard';
 import { useDebounce } from '../hooks/useDebounce';
-import { STUDENT, examStamp, VARIANT } from '../constants/student';
+import { STUDENT, examStamp, VARIANT, DEBOUNCE_MS } from '../constants/student';
+
+const FALLBACK_PRODUCTS = [
+    { id: 1, title: 'Balo chống nước KTX', price: 15, image: 'https://fakestoreapi.com/img/81fPKd-2AYL._AC_SL1500_.jpg', category: "men's clothing" },
+    { id: 2, title: 'Áo thun Slim Fit KTXGO', price: 22, image: 'https://fakestoreapi.com/img/71-3HjGNDUL._AC_SY879._SX._UX._SY._UT_.jpg', category: "men's clothing" },
+    { id: 3, title: 'Áo khoác Cotton Jacket', price: 55, image: 'https://fakestoreapi.com/img/71li-ujtlUL._AC_UX679_.jpg', category: "men's clothing" },
+    { id: 4, title: 'Vòng tay bạc IUH KTX', price: 45, image: 'https://fakestoreapi.com/img/71pWzhdJNwL._AC_UL640_QL65_ML3_.jpg', category: 'jewelery' },
+    { id: 5, title: 'Ổ cứng SSD di động 1TB', price: 109, image: 'https://fakestoreapi.com/img/61U7T1koQqL._AC_SX679_.jpg', category: 'electronics' },
+    { id: 6, title: 'Màn hình Gaming 24 inch', price: 159, image: 'https://fakestoreapi.com/img/81QpkIctqPL._AC_SX679_.jpg', category: 'electronics' },
+];
 
 const fetchProducts = async () => {
-    const response = await axiosClient.get('https://fakestoreapi.com/products');
-    return response.data;
+    try {
+        const response = await axiosClient.get('https://fakestoreapi.com/products');
+        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+            return response.data;
+        }
+        return FALLBACK_PRODUCTS;
+    } catch {
+        return FALLBACK_PRODUCTS;
+    }
 };
 
 export const ShopScreen = ({ navigation }: any) => {
     const [searchQuery, setSearchQuery] = useState('');
-    const debouncedSearch = useDebounce(searchQuery);
+    const debouncedSearch = useDebounce(searchQuery, DEBOUNCE_MS);
 
     const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
         queryKey: ['products'],
@@ -70,7 +86,7 @@ export const ShopScreen = ({ navigation }: any) => {
                         Sinh viên: {STUDENT.hoTen} ({STUDENT.mssv})
                     </Text>
                     <Text style={styles.errorSub}>{(error as Error)?.message || 'Không thể kết nối máy chủ'}</Text>
-                    <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
+                    <TouchableOpacity style={styles.retryBtn} onPress={() => { refetch(); }}>
                         <Text style={styles.retryBtnText}>Thử lại</Text>
                     </TouchableOpacity>
                 </View>
@@ -88,11 +104,10 @@ export const ShopScreen = ({ navigation }: any) => {
                             />
                         )}
                         numColumns={2}
-                        estimatedItemSize={200}
                         keyExtractor={item => `${STUDENT.mssv}_${item.id}`}
                         contentContainerStyle={styles.listContent}
                         refreshControl={
-                            <RefreshControl refreshing={isRefetching} onRefresh={refetch} colors={['#1A56DB']} />
+                            <RefreshControl refreshing={isRefetching} onRefresh={() => { refetch(); }} colors={['#1A56DB']} />
                         }
                         ListEmptyComponent={
                             <View style={styles.emptyContainer}>
