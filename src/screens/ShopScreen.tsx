@@ -1,139 +1,390 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-    View,
-    Text,
-    TextInput,
-    ActivityIndicator,
-    TouchableOpacity,
-    StyleSheet,
-    RefreshControl,
-    SafeAreaView,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  SafeAreaView,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
-import { axiosClient } from '../api/axiosClient';
-import { ProductCard } from '../components/ProductCard';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
+import { useNavigation } from '@react-navigation/native';
+import { fetchProducts, Product } from '../api/apiClient';
 import { useDebounce } from '../hooks/useDebounce';
-import { STUDENT, examStamp, VARIANT, DEBOUNCE_MS } from '../constants/student';
+import { useCartStore } from '../store/cartStore';
+import { STUDENT, VARIANT, examStamp, DEBOUNCE_MS, STALE_TIME_MS, PRICE_MULTIPLIER, ROOM_LABEL } from '../constants/student';
+import { COLORS } from '../constants/theme';
 
-const fetchProducts = async () => {
-    const response = await axiosClient.get('/products');
-    return response.data;
-};
+const CATEGORIES = ['all', "men's clothing", "women's clothing", 'jewelery', 'electronics'];
 
-export const ShopScreen = ({ navigation }: any) => {
-    const [searchQuery, setSearchQuery] = useState('');
-    const debouncedSearch = useDebounce(searchQuery, DEBOUNCE_MS);
+export const ShopScreen = () => {
+  const navigation = useNavigation<any>();
+  const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const debouncedSearch = useDebounce(search, DEBOUNCE_MS);
+  const addToCart = useCartStore((state) => state.addToCart);
 
-    const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
-        queryKey: ['products'],
-        queryFn: fetchProducts,
-    });
+  const {
+    data: products = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['products', selectedCategory],
+    queryFn: () => fetchProducts(selectedCategory),
+    staleTime: STALE_TIME_MS,
+  });
 
-    const filteredData = (data || []).filter((item: any) =>
-        (item.title || item.name || '').toLowerCase().includes(debouncedSearch.toLowerCase())
+  const filteredProducts = useMemo(() => {
+    if (!debouncedSearch.trim()) return products;
+    return products.filter((item) =>
+      item.title.toLowerCase().includes(debouncedSearch.toLowerCase()),
     );
+  }, [products, debouncedSearch]);
+
+  const handleAddToCart = (item: Product) => {
+    try {
+      ReactNativeHapticFeedback.trigger(
+        VARIANT.hapticOnAdd === 'impact' ? 'impactMedium' : 'selection',
+      );
+    } catch {
+      // Ignored for emulator fallback
+    }
+
+    addToCart(
+      {
+        id: item.id,
+        title: item.title,
+        price: Math.round(item.price * PRICE_MULTIPLIER),
+        image: item.image,
+        category: item.category,
+      },
+      1,
+    );
+  };
+
+  const stampText = `TH2 · ${STUDENT.mssv} · ${STUDENT.hoTen} · #${examStamp()}`;
+
+  const renderProductItem = ({ item }: { item: Product }) => {
+    const formattedPrice = (Math.round(item.price * PRICE_MULTIPLIER)).toLocaleString('vi-VN') + ' đ';
 
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Watermark ở trên hoặc dưới theo VARIANT */}
-            {VARIANT.watermarkAtTop && (
-                <View style={styles.watermark}>
-                    <Text style={styles.wmText}>
-                        TH2 · {STUDENT.mssv} · {STUDENT.hoTen} · {examStamp()}
-                    </Text>
-                </View>
-            )}
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.8}
+        onPress={() => navigation.navigate('ProductDetail', { product: item })}
+      >
+        <Image source={{ uri: item.image }} style={styles.cardImage} resizeMode="contain" />
+        <View style={styles.cardContent}>
+          <Text style={styles.cardCategory} numberOfLines={1}>
+            {item.category.toUpperCase()}
+          </Text>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <Text style={styles.cardPrice}>{formattedPrice}</Text>
 
-            <View style={styles.header}>
-                <TextInput
-                    style={styles.searchInput}
-                    placeholder="Tìm kiếm sản phẩm..."
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                />
-            </View>
-
-            {/* Trạng thái Pending (Đang tải) */}
-            {isLoading && (
-                <View style={styles.centerContainer}>
-                    <ActivityIndicator size="large" color="#1A56DB" />
-                    <Text style={styles.loadingText}>Đang tải sản phẩm...</Text>
-                </View>
-            )}
-
-            {/* Trạng thái Error (Mất mạng / Lỗi API) */}
-            {isError && (
-                <View style={styles.centerContainer}>
-                    <Text style={styles.errorTitle}>LỖI TẢI DỮ LIỆU</Text>
-                    <Text style={styles.errorText}>
-                        Sinh viên: {STUDENT.hoTen} ({STUDENT.mssv})
-                    </Text>
-                    <Text style={styles.errorSub}>{(error as Error)?.message || 'Không thể kết nối máy chủ'}</Text>
-                    <TouchableOpacity style={styles.retryBtn} onPress={() => { refetch(); }}>
-                        <Text style={styles.retryBtnText}>Thử lại</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
-
-            {/* Trạng thái Data (Danh sách FlashList) */}
-            {!isLoading && !isError && (
-                <View style={styles.listContainer}>
-                    <FlashList
-                        data={filteredData}
-                        renderItem={({ item }: { item: any }) => (
-                            <ProductCard
-                                item={item}
-                                onPress={() => navigation.navigate('ProductDetail', { id: String(item.id) })}
-                            />
-                        )}
-                        numColumns={2}
-                        keyExtractor={(item: any) => `${STUDENT.mssv}_${item.id}`}
-                        contentContainerStyle={styles.listContent}
-                        refreshControl={
-                            <RefreshControl refreshing={isRefetching} onRefresh={() => { refetch(); }} colors={['#1A56DB']} />
-                        }
-                        ListEmptyComponent={
-                            <View style={styles.emptyContainer}>
-                                <Text style={styles.emptyText}>Không tìm thấy sản phẩm nào</Text>
-                            </View>
-                        }
-                    />
-                </View>
-            )}
-
-            {!VARIANT.watermarkAtTop && (
-                <View style={styles.watermark}>
-                    <Text style={styles.wmText}>
-                        TH2 · {STUDENT.mssv} · {STUDENT.hoTen} · {examStamp()}
-                    </Text>
-                </View>
-            )}
-        </SafeAreaView>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => handleAddToCart(item)}
+          >
+            <Text style={styles.addButtonText}>+ Thêm vào giỏ</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
     );
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Watermark Top */}
+      {VARIANT.watermarkAtTop && (
+        <View style={styles.watermarkContainer}>
+          <Text style={styles.watermarkText}>{stampText}</Text>
+        </View>
+      )}
+
+      {/* Header Info */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerTitle}>KTXGO MART</Text>
+          <Text style={styles.headerSub}>Giao nhanh {ROOM_LABEL} · Ký Túc Xá</Text>
+        </View>
+        <View style={styles.badgeMssv}>
+          <Text style={styles.badgeMssvText}>{STUDENT.mssv}</Text>
+        </View>
+      </View>
+
+      {/* Search Input */}
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Tìm món đồ bạn thích..."
+          placeholderTextColor={COLORS.textLight}
+          value={search}
+          onChangeText={setSearch}
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')} style={styles.clearSearchBtn}>
+            <Text style={styles.clearSearchText}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Category Pills */}
+      <View style={styles.categoryList}>
+        <FlashList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={CATEGORIES}
+          renderItem={({ item }) => {
+            const isSelected = selectedCategory === item;
+            return (
+              <TouchableOpacity
+                style={[styles.catPill, isSelected && styles.catPillActive]}
+                onPress={() => setSelectedCategory(item)}
+              >
+                <Text style={[styles.catPillText, isSelected && styles.catPillTextActive]}>
+                  {item === 'all' ? 'Tất cả' : item}
+                </Text>
+              </TouchableOpacity>
+            );
+          }}
+        />
+      </View>
+
+      {/* 3 Network States */}
+      {isLoading ? (
+        <View style={styles.centerBox}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.statusText}>Đang tải danh sách món...</Text>
+        </View>
+      ) : isError ? (
+        <View style={styles.centerBox}>
+          <Text style={styles.errorText}>Lỗi kết nối mạng: {(error as any)?.message || 'Thử lại sau'}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
+            <Text style={styles.retryBtnText}>Thử lại</Text>
+          </TouchableOpacity>
+        </View>
+      ) : filteredProducts.length === 0 ? (
+        <View style={styles.centerBox}>
+          <Text style={styles.emptyText}>Không tìm thấy sản phẩm phù hợp</Text>
+        </View>
+      ) : (
+        <View style={styles.listContainer}>
+          <FlashList
+            data={filteredProducts}
+            renderItem={renderProductItem}
+            numColumns={2}
+            contentContainerStyle={styles.listContent}
+          />
+        </View>
+      )}
+
+      {/* Watermark Bottom */}
+      {!VARIANT.watermarkAtTop && (
+        <View style={styles.watermarkContainer}>
+          <Text style={styles.watermarkText}>{stampText}</Text>
+        </View>
+      )}
+    </SafeAreaView>
+  );
 };
 
+export default ShopScreen;
+
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F9FAFB' },
-    watermark: { backgroundColor: '#E0E7FF', paddingVertical: 4, alignItems: 'center' },
-    wmText: { fontSize: 11, fontWeight: 'bold', color: '#3730A3' },
-    header: { padding: 12, backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
-    searchInput: {
-        backgroundColor: '#F3F4F6',
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        fontSize: 14,
-    },
-    listContainer: { flex: 1, paddingHorizontal: 8 },
-    listContent: { paddingVertical: 8 },
-    centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-    loadingText: { marginTop: 10, color: '#6B7280' },
-    errorTitle: { fontSize: 18, fontWeight: 'bold', color: '#DC2626', marginBottom: 8 },
-    errorText: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 4 },
-    errorSub: { fontSize: 12, color: '#6B7280', textAlign: 'center', marginBottom: 16 },
-    retryBtn: { backgroundColor: '#1A56DB', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
-    retryBtnText: { color: '#FFF', fontWeight: 'bold' },
-    emptyContainer: { padding: 40, alignItems: 'center' },
-    emptyText: { color: '#9CA3AF' },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  watermarkContainer: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+  },
+  watermarkText: {
+    color: COLORS.primary,
+    fontWeight: '700',
+    fontSize: 11,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+  },
+  headerSub: {
+    fontSize: 13,
+    color: COLORS.textLight,
+    marginTop: 2,
+  },
+  badgeMssv: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+  },
+  badgeMssvText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    position: 'relative',
+  },
+  searchInput: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    height: 44,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    color: COLORS.text,
+    fontSize: 14,
+  },
+  clearSearchBtn: {
+    position: 'absolute',
+    right: 28,
+    top: 12,
+  },
+  clearSearchText: {
+    color: COLORS.textLight,
+    fontSize: 16,
+  },
+  categoryList: {
+    height: 44,
+    paddingHorizontal: 12,
+    marginBottom: 6,
+  },
+  catPill: {
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    justifyContent: 'center',
+  },
+  catPillActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  catPillText: {
+    fontSize: 13,
+    color: COLORS.text,
+    textTransform: 'capitalize',
+  },
+  catPillTextActive: {
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
+  listContainer: {
+    flex: 1,
+    paddingHorizontal: 8,
+  },
+  listContent: {
+    paddingBottom: 20,
+  },
+  card: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    margin: 6,
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cardImage: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  cardContent: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  cardCategory: {
+    fontSize: 10,
+    color: COLORS.textLight,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  cardTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.text,
+    minHeight: 34,
+    marginBottom: 6,
+  },
+  cardPrice: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.secondary,
+    marginBottom: 8,
+  },
+  addButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  addButtonText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  centerBox: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  statusText: {
+    marginTop: 10,
+    color: COLORS.textLight,
+    fontSize: 14,
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  retryBtn: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryBtnText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
+  emptyText: {
+    color: COLORS.textLight,
+    fontSize: 15,
+  },
 });
